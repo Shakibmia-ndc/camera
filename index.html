@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI Pro DSLR Camera</title>
+    
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#ffde00">
+    <link rel="apple-touch-icon" href="icon.png">
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.0"></script>
+
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: #000;
+            color: white;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        header {
+            padding: 15px;
+            text-align: center;
+            background: rgba(0,0,0,0.8);
+            font-weight: bold;
+            border-bottom: 1px solid #333;
+        }
+
+        #viewport {
+            position: relative;
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #111;
+        }
+
+        video { width: 100%; height: 100%; object-fit: cover; position: absolute; }
+
+        #final-photo {
+            max-width: 90%;
+            max-height: 80%;
+            border-radius: 10px;
+            display: none;
+            z-index: 10;
+        }
+
+        #loader {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 100;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 5px solid #333;
+            border-top: 5px solid #ffde00;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        .bottom-bar {
+            height: 150px;
+            background: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding-bottom: 20px;
+        }
+
+        #capture-btn {
+            width: 75px;
+            height: 75px;
+            background: white;
+            border: 6px solid #444;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        #save-link {
+            display: none;
+            position: absolute;
+            bottom: 20px;
+            z-index: 110;
+            color: #ffde00;
+            font-weight: bold;
+            text-decoration: none;
+            background: #333;
+            padding: 12px 25px;
+            border-radius: 25px;
+        }
+    </style>
+</head>
+<body>
+
+    <header>AI DSLR PRO</header>
+
+    <div id="viewport">
+        <video id="video" autoplay playsinline></video>
+        <img id="final-photo">
+        
+        <div id="loader">
+            <div class="spinner"></div>
+            <p style="margin-top: 15px;">AI Processing...</p>
+        </div>
+
+        <a id="save-link" href="#" download="DSLR_Shot.png">SAVE PHOTO</a>
+    </div>
+
+    <div class="bottom-bar">
+        <div id="capture-btn"></div>
+    </div>
+
+    <script>
+        // Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('sw.js');
+        }
+
+        const video = document.getElementById('video');
+        const finalPhoto = document.getElementById('final-photo');
+        const loader = document.getElementById('loader');
+        const saveLink = document.getElementById('save-link');
+        const captureBtn = document.getElementById('capture-btn');
+        let net;
+
+        async function init() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: 'environment' },
+                    audio: false
+                });
+                video.srcObject = stream;
+                net = await bodyPix.load();
+                console.log("AI Ready");
+            } catch (err) {
+                alert("Please use HTTPS or Local Server for Camera Access.");
+            }
+        }
+
+        captureBtn.addEventListener('click', async () => {
+            if(!net) return;
+            loader.style.display = 'flex';
+            
+            const segmentation = await net.segmentPerson(video);
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+
+            ctx.drawImage(video, 0, 0);
+            
+            // DSLR Filter Application
+            ctx.filter = "contrast(1.2) saturate(1.3) brightness(1.05) blur(5px)";
+            ctx.drawImage(canvas, 0, 0);
+
+            loader.style.display = 'none';
+            video.style.display = 'none';
+            finalPhoto.src = canvas.toDataURL('image/png');
+            finalPhoto.style.display = 'block';
+            saveLink.href = finalPhoto.src;
+            saveLink.style.display = 'inline';
+            captureBtn.style.display = 'none';
+        });
+
+        init();
+    </script>
+</body>
+</html>
